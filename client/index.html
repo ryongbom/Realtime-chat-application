@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time chat</title>
+    <link href="indexStyle.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>💬 Real-time Chat Level 1</h1>
+
+        <div class="status disconnected" id="status">
+            🔴 Not connected to server
+        </div>
+
+        <div class="socket-id" id="socketId">
+            Socket id:none
+        </div>
+
+        <div class="info-box" id="infoBox">
+            ⚡ Basic connection test<br>
+            <small style="display: block; margin-top: 10px;">
+                No chat functionality yet - just testing socket connection!
+            </small>
+        </div>
+    </div>
+
+    <!-- Socket.io client library -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // When connection is successful
+        socket.on('connect', () => {
+            console.log('Connected to server!', socket.id);
+
+            document.getElementById('status').className = 'status connected';
+            document.getElementById('status').innerHTML = '🟢 Connected to server!';
+
+            document.getElementById('socketId').innerHTML = `Socket ID: ${socket.id}`;
+            document.getElementById('infoBox').innerHTML = '✅ Connection established successfully!';
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server!');
+
+            document.getElementById('status').className = 'status disconnected';
+            document.getElementById('status').innerHTML = '🔴 Disconnected from server';
+
+            // clear socket id
+            document.getElementById('socketId').innerHTML = 'Socket ID: none';
+            
+            // Update info box
+            document.getElementById('infoBox').innerHTML = '❌ Connection lost. Trying to reconnect...';
+        });
+
+        socket.on('connect_error', (error) => {
+            console.log('Connection error:', error);
+            document.getElementById('infoBox').innerHTML = '⚠️ Connection error. Make sure server is running!';
+        });
+    </script>
+</body>
+</html>
