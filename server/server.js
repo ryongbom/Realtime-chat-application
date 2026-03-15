@@ -14,17 +14,23 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
-// 소켓련결처리
+// Socket connection processing
 io.on('connection', (socket) => {
     console.log('new user connected:', socket.id);
 
-    // 련결해제처리
+    socket.on('chat message', (msg) => {
+        console.log(`Message from ${socket.id}: ${msg}`);
+
+        socket.emit('chat message', `Echo: ${msg}`);
+    });
+
+    // Disconnection processing
     socket.on('disconnect', () => {
         console.log('user disconnected:', socket.id);
     });
 });
 
-// 서버 시작
+// Server is starting
 const PORT = 3000;
 server.listen(PORT, () => {
     console.log(`Server is running at http://localhost:${PORT}`);

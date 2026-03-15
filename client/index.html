@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>💬 Real-time Chat Level 1</h1>
+        <h1>Real-time Chat Level 1</h1>
 
         <div class="status disconnected" id="status">
             🔴 Not connected to server
@@ -18,11 +18,12 @@
             Socket id:none
         </div>
 
-        <div class="info-box" id="infoBox">
-            ⚡ Basic connection test<br>
-            <small style="display: block; margin-top: 10px;">
-                No chat functionality yet - just testing socket connection!
-            </small>
+        <div class="chat-box">
+            <ul id="messages"></ul>
+            <div class="input-area">
+                <input type="text" id="messageInput" placeholder="Type a message..." disabled>
+                <button id="sendButton" disabled>Send</button>
+            </div>
         </div>
     </div>
 
@@ -31,33 +32,86 @@
     <script>
         const socket = io();
 
+        const statusDiv = document.getElementById('status');
+        const socketIdDiv = document.getElementById('socketId');
+        const messageList = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+
         // When connection is successful
         socket.on('connect', () => {
             console.log('Connected to server!', socket.id);
 
-            document.getElementById('status').className = 'status connected';
-            document.getElementById('status').innerHTML = '🟢 Connected to server!';
+            statusDiv.className = 'status connected';
+            statusDiv.innerHTML = '🟢 Connected to server!';
+            socketIdDiv.innerHTML = `Socket ID: ${socket.id}`;
 
-            document.getElementById('socketId').innerHTML = `Socket ID: ${socket.id}`;
-            document.getElementById('infoBox').innerHTML = '✅ Connection established successfully!';
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            messageInput.focus();
+
+            addMessage('system', '✅ Connected to server. You can now send messages!');
         });
 
         socket.on('disconnect', () => {
             console.log('Disconnected from server!');
 
-            document.getElementById('status').className = 'status disconnected';
-            document.getElementById('status').innerHTML = '🔴 Disconnected from server';
-
-            // clear socket id
-            document.getElementById('socketId').innerHTML = 'Socket ID: none';
+            statusDiv.className = 'status disconnected';
+            statusDiv.innerHTML = '🔴 Disconnected from server';
+            socketIdDiv.innerHTML = 'Socket ID: none';
             
-            // Update info box
-            document.getElementById('infoBox').innerHTML = '❌ Connection lost. Trying to reconnect...';
+            // 입력창과 버튼 비활성화
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            
+            addMessage('system', '❌ Disconnected from server');
+        });
+
+        socket.on('chat message', (msg) => {
+            addMessage('server', msg);
+        });
+
+        function sendMessage() {
+            const msg = messageInput.value.trim();
+            if (msg) {
+                addMessage('me', msg);
+
+                socket.emit('chat message', msg);
+
+                messageInput.value = '';
+            }
+        }
+
+        function addMessage(type, text) {
+            const li = document.createElement('li');
+            li.textContent = text;
+
+            if (type === 'me') {
+                li.className = 'my-message';
+            } else if (type === 'server') {
+                li.className = 'server-message';
+            } else {
+                li.style.backgroundColor = '#fff3cd';
+                li.style.color = '#856404';
+                li.style.textAlign = 'center';
+            }
+
+            messageList.appendChild(li);
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
         });
 
         socket.on('connect_error', (error) => {
             console.log('Connection error:', error);
-            document.getElementById('infoBox').innerHTML = '⚠️ Connection error. Make sure server is running!';
+            
+            addMessage('system', '⚠️ Connection error. Make sure server is running!');
         });
     </script>
 </body>
