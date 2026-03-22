@@ -18,7 +18,7 @@
 
     <div id="chatScreen">
         <div class="header-chat">
-            <span id="nickname"></span>
+            <span id="nickname" style="margin-left: 20px; margin-bottom: 10px; color: white;"></span>
             <span class="status">Connected</span>
         </div>
 
@@ -40,10 +40,11 @@
         const nicknameInput = document.querySelector('.nicknameInput');
         const loginScreen = document.getElementById('loginScreen');
         const chatScreen = document.getElementById('chatScreen');
+        const nicknameDisplay = document.getElementById('nickname');
 
         const socket = io();
         let mySocketId = '';
-        let nickname = '';
+        let myNickname = '';
 
         socket.on('connect', () => {
             console.log('Successfully connected', socket.id);
@@ -51,64 +52,102 @@
         });
 
         socket.on('chat message', (data) => {
-            addMessage(data.type, data.userId, data.content, data.timeStamp);
-        })
+            addMessage(data.type, data.userId, data.nickname, data.content, data.timeStamp);
+        });
 
-        socket.on('system nick', (data) => {
-            console.log('successfully receive nickname', data.nickname);
-            addMessage(data.type, data.userId, data.nickname, data.timeStamp);
-        })
+        socket.on('system message', (data) => {
+            addSystemMessage(data.content, data.timeStamp);
+        });
 
         socket.on('disconnect', () => {
-            console.log('disconnected');
-        })
+            console.log('disconnected from server');
+            statusDisconnected();
+        });
 
         function statusDisconnected() {
             document.querySelector('.status').textContent = 'disconnected';
             document.querySelector('.status').style.color = 'red';
+            messageInput.disabled = true;
         }
 
         function login() {
-            nickname = nicknameInput.value.trim();
+            myNickname = nicknameInput.value.trim();
+
+            if (myNickname === '') {
+                alert('Please enter a nickname!');
+                return;
+            }
+
+            nicknameDisplay.textContent = myNickname;
 
             socket.emit('nickname', {
-                type: 'system',
-                nickname: nickname,
-                userId: mySocketId,
+                nickname: myNickname,
                 timeStamp: new Date().toLocaleTimeString()
             });
 
-            console.log('successfully sended nickname', nickname);
+            console.log('nickname sent:', myNickname);
 
             loginScreen.style.display = 'none';
             chatScreen.style.display = 'block';
+            messageInput.focus();
         }
 
         function sendMessage() {
-            const msg = messageInput.value;
+            const msg = messageInput.value.trim();
+            if (msg === '') {
+                return;
+            }
+
             socket.emit('chat message', {
                 type: 'user',
                 content: msg,
                 userId: mySocketId,
                 timeStamp: new Date().toLocaleTimeString()
             });
-            console.log('send message: ', msg);
-            addMessage('me', msg);
+
             messageInput.value = '';
+            messageInput.focus();
         }
 
-        function addMessage(type, id, msg, time) {
+        function addMessage(type, userId, nickname, content, time) {
             const newMessage = document.createElement('div');
             if (type === 'user') {
-                newMessage.className = 'user-message';
-                newMessage.textContent = msg;
-                messages.appendChild(newMessage);
-            } else if (type === 'system') {
-                newMessage.className = 'system-message';
-                newMessage.textContent = `${msg} joined at ${time}`;
-                messages.appendChild(newMessage);
-            }
+                if (mySocketId === userId) {
+                    newMessage.className = 'my-message';
+                    newMessage.innerHTML = `
+                        <div class="message-content">${content}</div>
+                        <div class="message-time">${time}</div>
+                    `;
+                } else {
+                    newMessage.className = 'user-message';
+                    newMessage.innerHTML = `
+                        <div class="message-nickname">${nickname}</div>
+                        <div class="message-content">${content}</div>
+                        <div class="message-time">${time}</div>
+                    `;
+                }
+            } 
+            
+            messages.appendChild(newMessage);
+            messages.scrollTop = messages.scrollHeight;
         }
+
+        function addSystemMessage(content, time) {
+            const newMessage = document.createElement('div');
+            newMessage.className = 'system-message';
+            newMessage.innerHTML = `
+                <div class="system-content">📢 ${content}</div>
+                <div class="system-time">${time}</div>
+            `;
+            messages.appendChild(newMessage);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
     </script>
 </body>
 </html>
