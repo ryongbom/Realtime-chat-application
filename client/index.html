@@ -17,19 +17,25 @@
     </div>
 
     <div id="chatScreen">
-        <div class="header-chat">
-            <span id="nickname" style="margin-left: 20px; margin-bottom: 10px; color: white;"></span>
-            <span class="status">Connected</span>
-        </div>
-
-        <div id="messages">
+        <div class="left-area">
 
         </div>
+        <div class="main-chat">
+            <div class="header-chat">
+                <span id="nickname" style="margin-left: 20px; margin-bottom: 10px; color: white;"></span>
+                <span class="status">Connected</span>
+            </div>
 
-        <div class="footer-chat">
-            <input type="text" class="messageInput" placeholder="Enter your message...">
-            <button onclick="sendMessage()" class="sendBtn">Send</button>
+            <div id="messages">
+
+            </div>
+
+            <div class="footer-chat">
+                <input type="text" class="messageInput" placeholder="Enter your message...">
+                <button onclick="sendMessage()" class="sendBtn">Send</button>
+            </div>
         </div>
+        
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -88,7 +94,7 @@
             console.log('nickname sent:', myNickname);
 
             loginScreen.style.display = 'none';
-            chatScreen.style.display = 'block';
+            chatScreen.style.display = 'flex';
             messageInput.focus();
         }
 
