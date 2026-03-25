@@ -12,7 +12,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #f0f2f5;
+    background-color: #25405b;
 }
 
 #loginScreen {
@@ -23,9 +23,9 @@ body {
     align-items: center;
     justify-content: center;
     margin-top: 30px;
-    background-color: rgb(192, 212, 228);
+    background-color: #1a3046;
     border-radius: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 
 #chatScreen {
@@ -41,6 +41,67 @@ body {
 .left-area {
     width: 25%;
     background-color: #17212B;
+    display: flex;
+    flex-direction: column;
+}
+
+.create-room {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0;
+    gap: 10px;
+}
+
+.text-create {
+    color: #617180;
+}
+
+.createRoom {
+    width: 100px;
+    height: 35px;
+    border-radius: 20px;
+    color: #afc3d5;
+    background-color: #2B5278;
+    font-size: 15px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.createRoom:hover {
+    background-color: #4072a4;
+    color: white;
+}
+
+#roomList {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    width: 100%;
+    gap: 2px;
+}
+
+.newRoom {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    height: 60px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0px 10px;
+    transition: all 0.2s ease;
+    background-color: #1a3046;
+}
+
+.newRoom:hover {
+    background-color: #2B5278;
+}
+
+.newRoom-name {
+    color: #F5F5F5;
+    font-size: 18px;
 }
 
 .main-chat {
@@ -51,7 +112,7 @@ body {
 }
 
 #loginScreen h1 {
-    color: black;
+    color: #DDDDDD;
     margin-bottom: 20px;
 }
 
@@ -68,7 +129,7 @@ body {
 
 .inputArea label {
     font-size: 25px;
-    color: black;
+    color: #F5F5F5;
 }
 
 .nicknameInput {
@@ -78,6 +139,8 @@ body {
     border: 1px solid grey;
     font-size: 20px;
     padding-left: 10px;
+    background-color: #2a445e;
+    color: #bbb8b8;
 }
 
 .loginBtn {
@@ -85,7 +148,7 @@ body {
     height: 50px;
     border-radius: 30px;
     border: none;
-    background-color: rgb(128, 154, 211);
+    background-color: rgb(101, 139, 221);
     font-size: 19px;
     color: white;
     cursor: pointer;
@@ -93,7 +156,7 @@ body {
 }
 
 .loginBtn:hover {
-    background-color: rgb(101, 139, 221);
+    background-color: #57db8a;
 }
 
 .header-chat {
@@ -164,7 +227,7 @@ body {
 }
 
 .message-content {
-    font-size: 14px;
+    font-size: 18px;
     line-height: 1.4;
 }
 

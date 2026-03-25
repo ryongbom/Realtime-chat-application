@@ -16,55 +16,97 @@ app.get('/', (req, res) => {
 });
 
 const users = new Map();
+const rooms = new Map();
+
+function getRoomList() {
+    return Array.from(rooms.keys());
+}
 
 io.on('connection', (socket) => {
     console.log('connected to Server', socket.id);
+    let currentUser = null;
 
     socket.on('nickname', (data) => {
-        users.set(socket.id, { nickname: data.nickname });
+        currentUser = { nickname: data.nickname, currentRoom: null };
+        users.set(socket.id, currentUser);
 
-        console.log(`👤 ${data.nickname} joined (${socket.id})`);
-
-        io.emit('system message', {
-            type: 'system',
-            content: `${data.nickname} joined the chat`,
-            timeStamp: data.timeStamp
-        });
+        console.log(`👤 ${data.nickname} joined`);
 
         socket.emit('system message', {
-            type: 'system message',
-            content: `Welcome ${data.nickname}`,
+            content: `✨ Welcome ${data.nickname} ✨`,
             timeStamp: new Date().toLocaleTimeString()
         });
+
+        socket.emit('room list', getRoomList());
     });
 
     socket.on('chat message', (data) => {
-        const user = users.get(socket.id);
-        const nickname = user ? user.nickname : 'Unknown';
+        if (currentUser && currentUser.currentRoom) {
+            io.to(currentUser.currentRoom).emit('chat message', {
+                type: 'user',
+                content: data.content,
+                userId: data.userId,
+                nickname: currentUser.nickname,
+                timeStamp: new Date().toLocaleTimeString()
+            });
+        }
+    });
 
-        io.emit('chat message', {
-            type: 'user',
-            content: data.content,
-            userId: data.userId,
-            nickname: nickname,
-            timeStamp: new Date().toLocaleTimeString()
-        });
+    socket.on('create room', (roomName) => {
+        if (!rooms.has(roomName)) {
+            rooms.set(roomName, new Set());
+
+            if (currentUser) {
+                if (currentUser.currentRoom) {
+                    socket.leave(currentUser.currentRoom);
+                }
+                socket.join(roomName);
+                currentUser.currentRoom = roomName;
+            }
+
+            io.emit('room list', getRoomList());
+
+            socket.emit('system message', {
+                content: `'${roomName}' room created`,
+                timeStamp: new Date().toLocaleTimeString()
+            });
+        } else {
+            socket.emit('system message', {
+                content: `Here is already name of room '${roomName}'`,
+                timeStamp: new Date().toLocaleTimeString()
+            });
+        }
+    });
+
+    socket.on('join room', (roomName) => {
+        if (rooms.has(roomName) && currentUser) {
+            if (currentUser.currentRoom) {
+                socket.leave(currentUser.currentRoom);
+            }
+            socket.join(roomName);
+            currentUser.currentRoom = roomName;
+
+            socket.emit('room joined', roomName);
+
+            socket.to(roomName).emit('system message', {
+                content: `👋 ${currentUser.nickname} joined to this room`,
+                timeStamp: new Date().toLocaleTimeString()
+            });
+        }
     });
 
     socket.on('disconnect', () => {
-        const user = users.get(socket.id);
-        if (user) {
-            console.log(`${user.nickname} disconnected (${socket.id})`);
+        if (currentUser) {
+            console.log(`${currentUser.nickname} disconnected`);
 
-            io.emit('system message', {
-                type: 'system',
-                content: `${user.nickname} left the chat`,
-                timeStamp: new Date().toLocaleTimeString()
-            });
+            if (currentUser.currentRoom) {
+                socket.to(currentUser.currentRoom).emit('system message', {
+                    content: `${currentUser.nickname}left from Server`,
+                    timeStamp: new Date().toLocaleTimeString()
+                });
+            }
 
             users.delete(socket.id);
-        } else {
-            console.log(`Unknown user disconnected (${socket.id})`);
         }
     });
 });

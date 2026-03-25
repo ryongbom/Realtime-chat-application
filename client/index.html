@@ -18,12 +18,20 @@
 
     <div id="chatScreen">
         <div class="left-area">
+            <div class="create-room">
+                <p class="text-create">Do you want to create chating room?</p>
+                <button onclick="createRoom()" class="createRoom">Create</button>
+            </div>
 
+            <div id="roomList">
+
+            </div>
         </div>
         <div class="main-chat">
             <div class="header-chat">
-                <span id="nickname" style="margin-left: 20px; margin-bottom: 10px; color: white;"></span>
-                <span class="status">Connected</span>
+                <span id="currentRoom" style="margin-left: 20px; color: #2B5278; margin-bottom: 7px;">No room</span>
+                <span id="nickname" style="margin-left: 20px; color: white; margin-bottom: 7px;"></span>
+                <span class="status">● Connected</span>
             </div>
 
             <div id="messages">
@@ -31,7 +39,7 @@
             </div>
 
             <div class="footer-chat">
-                <input type="text" class="messageInput" placeholder="Enter your message...">
+                <input type="text" class="messageInput" placeholder="Write your message...">
                 <button onclick="sendMessage()" class="sendBtn">Send</button>
             </div>
         </div>
@@ -47,6 +55,8 @@
         const loginScreen = document.getElementById('loginScreen');
         const chatScreen = document.getElementById('chatScreen');
         const nicknameDisplay = document.getElementById('nickname');
+        const roomList = document.getElementById('roomList');
+        const currentRoomSpan = document.getElementById('currentRoom');
 
         const socket = io();
         let mySocketId = '';
@@ -55,6 +65,15 @@
         socket.on('connect', () => {
             console.log('Successfully connected', socket.id);
             mySocketId = socket.id;
+        });
+
+        socket.on('room list', (rooms) => {
+            displayRoomList(rooms);
+        });
+
+        socket.on('room joined', (roomName) => {
+            currentRoomSpan.textContent = roomName;
+            messages.innerHTML = '';
         });
 
         socket.on('chat message', (data) => {
@@ -76,6 +95,31 @@
             messageInput.disabled = true;
         }
 
+        function createRoom() {
+            const roomName = prompt('Enter your room name:');
+            if (roomName && roomName.trim()) {
+                socket.emit('create room', roomName.trim());
+            }
+            currentRoomSpan.textContent = 'my Chating Room';
+        }
+
+        function displayRoomList(rooms) {
+            roomList.innerHTML = '';
+            rooms.forEach(room => {
+                const newRoom = document.createElement('div');
+                newRoom.className = 'newRoom';
+                newRoom.innerHTML = `
+                        <p class="newRoom-name">${escapeHtml(room)}</p>
+                    `;
+                newRoom.onclick = () => joinRoom(room); // This is active when newRoom click
+                roomList.appendChild(newRoom);
+            })
+        }
+
+        function joinRoom(roomName) {
+            socket.emit('join room', roomName);
+        }
+
         function login() {
             myNickname = nicknameInput.value.trim();
 
@@ -87,8 +131,7 @@
             nicknameDisplay.textContent = myNickname;
 
             socket.emit('nickname', {
-                nickname: myNickname,
-                timeStamp: new Date().toLocaleTimeString()
+                nickname: myNickname
             });
 
             console.log('nickname sent:', myNickname);
@@ -105,7 +148,6 @@
             }
 
             socket.emit('chat message', {
-                type: 'user',
                 content: msg,
                 userId: mySocketId,
                 timeStamp: new Date().toLocaleTimeString()
@@ -147,6 +189,13 @@
             `;
             messages.appendChild(newMessage);
             messages.scrollTop = messages.scrollHeight;
+        }
+
+        // What is it???
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         messageInput.addEventListener('keypress', (e) => {
