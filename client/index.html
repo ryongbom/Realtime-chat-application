@@ -62,6 +62,8 @@
         let mySocketId = '';
         let myNickname = '';
 
+        let unreadCounts = {};
+
         socket.on('connect', () => {
             console.log('Successfully connected', socket.id);
             mySocketId = socket.id;
@@ -78,6 +80,14 @@
 
         socket.on('chat message', (data) => {
             addMessage(data.type, data.userId, data.nickname, data.content, data.timeStamp);
+
+            const currentRoom = currentRoomSpan.textContent;
+            if (data.type === 'user' && data.userId !== mySocketId) {
+                if (data.currentRoom !== currentRoom) {
+                    unreadCounts[data.currentRoom] = (unreadCounts[data.currentRoom] || 0) + 1;
+                    upgradeRoomBadge(data.currentRoom);
+                }
+            }
         });
 
         socket.on('system message', (data) => {
@@ -112,11 +122,39 @@
                     `;
                 newRoom.onclick = () => joinRoom(room); // This is active when newRoom click
                 roomList.appendChild(newRoom);
-            })
+
+                if (unreadCounts[room] > 0) {
+                    upgradeRoomBadge(room);
+                }
+            });
+        }
+
+        function upgradeRoomBadge(roomName) {
+            const rooms = document.querySelectorAll('.newRoom');
+            for (let room of rooms) {
+                const roomNameElement = room.querySelector('.newRoom-name');
+                if (roomNameElement && roomNameElement.textContent === roomName) {
+                    const count = unreadCounts[roomName] || 0;
+
+                    const oldBadge = room.querySelector('.badge');
+                    if (oldBadge) oldBadge.remove();
+
+                    if (count > 0) {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge';
+                        badge.textContent = count > 99 ? '99+' : count;
+                        room.appendChild(badge);
+                    }
+                    break;
+                }
+            }
         }
 
         function joinRoom(roomName) {
             socket.emit('join room', roomName);
+
+            unreadCounts[roomName] = 0;
+            upgradeRoomBadge(roomName);
         }
 
         function login() {

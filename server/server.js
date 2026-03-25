@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const { timeStamp } = require('console');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,6 +21,13 @@ function getRoomList() {
     return Array.from(rooms.keys());
 }
 
+function formatTime(time = new Date()) {
+    return time.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
 io.on('connection', (socket) => {
     console.log('connected to Server', socket.id);
     let currentUser = null;
@@ -34,7 +40,7 @@ io.on('connection', (socket) => {
 
         socket.emit('system message', {
             content: `✨ Welcome ${data.nickname} ✨`,
-            timeStamp: new Date().toLocaleTimeString()
+            timeStamp: formatTime()
         });
 
         socket.emit('room list', getRoomList());
@@ -47,7 +53,8 @@ io.on('connection', (socket) => {
                 content: data.content,
                 userId: data.userId,
                 nickname: currentUser.nickname,
-                timeStamp: new Date().toLocaleTimeString()
+                currentRoom: currentUser.currentRoom,
+                timeStamp: formatTime()
             });
         }
     });
@@ -68,12 +75,14 @@ io.on('connection', (socket) => {
 
             socket.emit('system message', {
                 content: `'${roomName}' room created`,
-                timeStamp: new Date().toLocaleTimeString()
+                timeStamp: formatTime()
             });
+
+            socket.emit('room joined', roomName);
         } else {
             socket.emit('system message', {
                 content: `Here is already name of room '${roomName}'`,
-                timeStamp: new Date().toLocaleTimeString()
+                timeStamp: formatTime()
             });
         }
     });
@@ -90,7 +99,7 @@ io.on('connection', (socket) => {
 
             socket.to(roomName).emit('system message', {
                 content: `👋 ${currentUser.nickname} joined to this room`,
-                timeStamp: new Date().toLocaleTimeString()
+                timeStamp: formatTime()
             });
         }
     });
@@ -102,7 +111,7 @@ io.on('connection', (socket) => {
             if (currentUser.currentRoom) {
                 socket.to(currentUser.currentRoom).emit('system message', {
                     content: `${currentUser.nickname} left from Server`,
-                    timeStamp: new Date().toLocaleTimeString()
+                    timeStamp: formatTime()
                 });
             }
 
