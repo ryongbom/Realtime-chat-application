@@ -101,7 +101,7 @@ io.on('connection', (socket) => {
 
             if (currentUser.currentRoom) {
                 socket.to(currentUser.currentRoom).emit('system message', {
-                    content: `${currentUser.nickname}left from Server`,
+                    content: `${currentUser.nickname} left from Server`,
                     timeStamp: new Date().toLocaleTimeString()
                 });
             }

@@ -100,7 +100,6 @@
             if (roomName && roomName.trim()) {
                 socket.emit('create room', roomName.trim());
             }
-            currentRoomSpan.textContent = 'my Chating Room';
         }
 
         function displayRoomList(rooms) {
