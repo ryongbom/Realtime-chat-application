@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const mongoose = require('mongoose');
+const Message = require('./models/Message');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,6 +30,33 @@ function formatTime(time = new Date()) {
     });
 }
 
+async function saveMessage(room, data) {
+    try {
+        const message = new Message({
+            type: data.type,
+            content: data.content,
+            userId: data.userId,
+            nickname: data.nickname,
+            room: room
+        });
+        await message.save();
+        console.log('message successfully saved');
+    } catch (err) {
+        console.log('save Error', err);
+    }
+}
+
+mongoose.connect('mongodb://localhost:27017/chatingApp')
+    .then(() => {
+        console.log('Successfully conneted to mongoDB!');
+        server.listen(3000, () => {
+            console.log('Server is running at http://localhost:3000');
+        });
+    })
+    .catch(err => {
+        console.log('Error to connect', err);
+    });
+
 io.on('connection', (socket) => {
     console.log('connected to Server', socket.id);
     let currentUser = null;
@@ -46,8 +75,15 @@ io.on('connection', (socket) => {
         socket.emit('room list', getRoomList());
     });
 
-    socket.on('chat message', (data) => {
+    socket.on('chat message', async (data) => {
         if (currentUser && currentUser.currentRoom) {
+            saveMessage(currentUser.currentRoom, {
+                type: 'user',
+                content: data.content,
+                userId: data.userId,
+                nickname: currentUser.nickname
+            });
+
             io.to(currentUser.currentRoom).emit('chat message', {
                 type: 'user',
                 content: data.content,
@@ -87,7 +123,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('join room', (roomName) => {
+    socket.on('join room', async (roomName) => {
         if (rooms.has(roomName) && currentUser) {
             if (currentUser.currentRoom) {
                 socket.leave(currentUser.currentRoom);
@@ -101,6 +137,9 @@ io.on('connection', (socket) => {
                 content: `👋 ${currentUser.nickname} joined to this room`,
                 timeStamp: formatTime()
             });
+
+            const history = await Message.find({ room: roomName }).sort({ timeStamp: 1 });
+            socket.emit('room history', history);
         }
     });
 
@@ -118,8 +157,4 @@ io.on('connection', (socket) => {
             users.delete(socket.id);
         }
     });
-});
-
-server.listen(3000, () => {
-    console.log('Server is running at http://localhost:3000');
 });

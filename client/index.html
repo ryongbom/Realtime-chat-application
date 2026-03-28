@@ -64,6 +64,13 @@
 
         let unreadCounts = {};
 
+        function formatTime(date) {
+            return new Date(date).toLocaleTimeString('ko-KR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
         socket.on('connect', () => {
             console.log('Successfully connected', socket.id);
             mySocketId = socket.id;
@@ -92,6 +99,13 @@
 
         socket.on('system message', (data) => {
             addSystemMessage(data.content, data.timeStamp);
+        });
+
+        socket.on('room history', (messages) => {
+            messages.forEach((message) => {
+                const timeStr = formatTime(message.timeStamp);
+                addMessage(message.type, message.userId, message.nickname, message.content, timeStr);
+            })
         });
 
         socket.on('disconnect', () => {
