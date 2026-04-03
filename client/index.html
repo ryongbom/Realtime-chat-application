@@ -7,13 +7,31 @@
     <link href="indexStyle.css" rel="stylesheet">
 </head>
 <body>
-    <div id="loginScreen">
-        <h1>Log in (Simple Chat)</h1>
-        <div class="inputArea">
-            <label>nickname:</label>
-            <input type="text" class="nicknameInput" placeholder="Enter your Nickname...">
+    <div id="authScreen">
+        <div class="auth-container">
+            <div class="auth-tabs">
+                <button class="tab-btn active" onclick="showTab('login')">Login</button>
+                <button class="tab-btn" onclick="showTab('register')">Register</button>
+            </div>
+
+            <div id="loginForm" class="auth-form active">
+                <h2>Welcome Back</h2>
+                <input type="email" id="loginEmail" placeholder="Email" class="auth-input">
+                <input type="password" id="loginPassword" placeholder="Password" class="auth-input">
+                <button onclick="login()" class="auth-btn">Login</button>
+                <div id="loginError" class="error-message"></div>
+            </div>
+
+            <div id="registerForm" class="auth-form">
+                <h2>Create Account</h2>
+                <input type="email" id="regEmail" placeholder="Email" class="auth-input">
+                <input type="text" id="regNickname" placeholder="Nickname" class="auth-input">
+                <input type="password" id="regPassword" placeholder="Password" class="auth-input">
+                <input type="password" id="regConfirmPassword" placeholder="Confirm Password" class="auth-input">
+                <button onclick="register()" class="auth-btn">Register</button>
+                <div id="registerError" class="error-message"></div>
+            </div>
         </div>
-        <button onclick="login()" class="loginBtn">Go to Chating ROOM</button>
     </div>
 
     <div id="chatScreen">
@@ -29,9 +47,14 @@
         </div>
         <div class="main-chat">
             <div class="header-chat">
-                <span id="currentRoom" style="margin-left: 20px; color: #2B5278; margin-bottom: 7px;">No room</span>
-                <span id="nickname" style="margin-left: 20px; color: white; margin-bottom: 7px;"></span>
-                <span class="status">● Connected</span>
+                <div class="status-section">
+                    <span id="currentRoom" style="margin-left: 20px; color: #2B5278;">No room</span>
+                    <span id="nickname" style="margin-left: 20px; color: white;"></span>
+                    <span class="status">● Connected</span>
+                </div>
+                <div class="logout-section">
+                    <button onclick="logout()" class="logoutbtn">Logout</button>
+                </div>
             </div>
 
             <div id="messages">
@@ -51,18 +74,175 @@
         const statusConnect = document.querySelector('.status');
         const messageInput = document.querySelector('.messageInput');
         const messages = document.getElementById('messages');
-        const nicknameInput = document.querySelector('.nicknameInput');
-        const loginScreen = document.getElementById('loginScreen');
+        const authScreen = document.getElementById('authScreen');
         const chatScreen = document.getElementById('chatScreen');
         const nicknameDisplay = document.getElementById('nickname');
         const roomList = document.getElementById('roomList');
         const currentRoomSpan = document.getElementById('currentRoom');
 
-        const socket = io();
+        let socket = null;
         let mySocketId = '';
         let myNickname = '';
-
         let unreadCounts = {};
+
+        function showTab(tab) {
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const tabs = document.querySelectorAll('.tab-btn');
+
+            if (tab === 'login') {
+                loginForm.classList.add('active');
+                registerForm.classList.remove('active');
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
+            } else {
+                loginForm.classList.remove('active');
+                registerForm.classList.add('active');
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const errorDiv = document.getElementById('loginError');
+
+            if (!email || !password) {
+                errorDiv.textContent = 'Please enter email and password';
+                return;
+            }
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    errorDiv.textContent = data.error || 'Login failed';
+                    return;
+                }
+
+                localStorage.setItem('chatToken', data.token);
+                localStorage.setItem('chatNickname', data.nickname);
+
+                myNickname = data.nickname;
+                nicknameDisplay.textContent = myNickname;
+
+                connectSocket(data.token);
+
+                authScreen.style.display = 'none';
+                chatScreen.style.display = 'flex';
+                messageInput.focus();
+            } catch (err) {
+                errorDiv.textContent = 'Connection error';
+            }
+        }
+
+        async function register() {
+            const email = document.getElementById('regEmail').value.trim();
+            const nickname = document.getElementById('regNickname').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            const confirm = document.getElementById('regConfirmPassword').value.trim();
+            const errorDiv = document.getElementById('registerError');
+
+            if (!email || !nickname || !password) {
+                errorDiv.textContent = 'All fields required';
+                return;
+            }
+
+            if (password !== confirm) {
+                errorDiv.textContent = 'Passwords do not match';
+                return;
+            }
+
+            try {
+                const res = await fetch('/register', {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, nickname, password })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    errorDiv.textContent = data.error || 'Registration failed';
+                    return;
+                }
+                
+                showTab('login');
+                document.getElementById('loginEmail').value = email;
+                errorDiv.textContent = 'Registration successful! Please login.';
+                setTimeout(() => {
+                    errorDiv.textContent = '';
+                }, 3000);
+                
+            } catch (err) {
+                errorDiv.textContent = 'Connection error';
+            }
+            
+        }
+
+        function connectSocket(token) {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            socket = io({
+                auth: { token: token }
+            });
+            
+            socket.on('connect', () => {
+                console.log('Successfully connected', socket.id);
+                mySocketId = socket.id;
+            });
+
+            socket.on('connect_error', (err) => {
+                console.log('Socket error:', err.message);
+                alert('Authentication failed. Please login again.');
+                logout();
+            });
+
+            socket.on('room list', (rooms) => {
+                displayRoomList(rooms);
+            });
+
+            socket.on('room joined', (roomName) => {
+                currentRoomSpan.textContent = roomName;
+                messages.innerHTML = '';
+            });
+
+            socket.on('chat message', (data) => {
+                addMessage(data.type, data.userId, data.nickname, data.content, data.timeStamp);
+
+                const currentRoom = currentRoomSpan.textContent;
+                if (data.type === 'user' && data.userId !== mySocketId) {
+                    if (data.currentRoom !== currentRoom) {
+                        unreadCounts[data.currentRoom] = (unreadCounts[data.currentRoom] || 0) + 1;
+                        upgradeRoomBadge(data.currentRoom);
+                    }
+                }
+            });
+
+            socket.on('system message', (data) => {
+                addSystemMessage(data.content, data.timeStamp);
+            });
+
+            socket.on('room history', (messages) => {
+                messages.forEach((message) => {
+                    const timeStr = formatTime(message.timeStamp);
+                    addMessage(message.type, message.userId, message.nickname, message.content, timeStr);
+                })
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected');
+                statusDisconnected();
+            });
+        }
 
         function formatTime(date) {
             return new Date(date).toLocaleTimeString('ko-KR', {
@@ -71,47 +251,13 @@
             });
         }
 
-        socket.on('connect', () => {
-            console.log('Successfully connected', socket.id);
-            mySocketId = socket.id;
-        });
-
-        socket.on('room list', (rooms) => {
-            displayRoomList(rooms);
-        });
-
-        socket.on('room joined', (roomName) => {
-            currentRoomSpan.textContent = roomName;
-            messages.innerHTML = '';
-        });
-
-        socket.on('chat message', (data) => {
-            addMessage(data.type, data.userId, data.nickname, data.content, data.timeStamp);
-
-            const currentRoom = currentRoomSpan.textContent;
-            if (data.type === 'user' && data.userId !== mySocketId) {
-                if (data.currentRoom !== currentRoom) {
-                    unreadCounts[data.currentRoom] = (unreadCounts[data.currentRoom] || 0) + 1;
-                    upgradeRoomBadge(data.currentRoom);
-                }
-            }
-        });
-
-        socket.on('system message', (data) => {
-            addSystemMessage(data.content, data.timeStamp);
-        });
-
-        socket.on('room history', (messages) => {
-            messages.forEach((message) => {
-                const timeStr = formatTime(message.timeStamp);
-                addMessage(message.type, message.userId, message.nickname, message.content, timeStr);
-            })
-        });
-
-        socket.on('disconnect', () => {
-            console.log('disconnected from server');
-            statusDisconnected();
-        });
+        function logout() {
+            if (socket) socket.disconnect();
+            localStorage.removeItem('chatToken');
+            localStorage.removeItem('chatNickname');
+            authScreen.style.display = 'flex';
+            chatScreen.style.display = 'none';
+        }
 
         function statusDisconnected() {
             document.querySelector('.status').textContent = 'disconnected';
@@ -171,27 +317,6 @@
             upgradeRoomBadge(roomName);
         }
 
-        function login() {
-            myNickname = nicknameInput.value.trim();
-
-            if (myNickname === '') {
-                alert('Please enter a nickname!');
-                return;
-            }
-
-            nicknameDisplay.textContent = myNickname;
-
-            socket.emit('nickname', {
-                nickname: myNickname
-            });
-
-            console.log('nickname sent:', myNickname);
-
-            loginScreen.style.display = 'none';
-            chatScreen.style.display = 'flex';
-            messageInput.focus();
-        }
-
         function sendMessage() {
             const msg = messageInput.value.trim();
             if (msg === '') {
@@ -211,7 +336,7 @@
         function addMessage(type, userId, nickname, content, time) {
             const newMessage = document.createElement('div');
             if (type === 'user') {
-                if (mySocketId === userId) {
+                if (mySocketId === userId || myNickname === nickname) {
                     newMessage.className = 'my-message';
                     newMessage.innerHTML = `
                         <div class="message-content">${content}</div>
@@ -254,6 +379,17 @@
                 sendMessage();
             }
         });
+
+        const savedToken = localStorage.getItem('chatToken');
+        const savedNickname = localStorage.getItem('chatNickname');
+
+        if (savedToken && savedNickname) {
+            myNickname = savedNickname;
+            nicknameDisplay.textContent = myNickname;
+            connectSocket(savedToken);
+            authScreen.style.display = 'none';
+            chatScreen.style.display = 'flex';
+        }
     </script>
 </body>
 </html>
