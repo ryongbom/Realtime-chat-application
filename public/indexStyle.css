@@ -223,6 +223,11 @@ body {
     margin-left: 2px;
 }
 
+.status-section {
+    display: flex;
+    flex-direction: row;
+}
+
 .header-chat .status {
     font-size: 15px;
     color: rgb(63, 185, 110);
@@ -245,6 +250,16 @@ body {
     transition: all 0.1s ease;
 }
 
+.typing-indicator {
+    font-size: 12px;
+    color: #8E9EAF;
+    padding: 4px 12px;
+    margin-left: 20px;
+    background-color: #17212B;
+    border-radius: 15px;
+    width: fit-content;
+}
+
 .logoutbtn:hover {
     background-color: #e23f4f;
     border-radius: 5px;
@@ -261,7 +276,7 @@ body {
     padding: 10px 0;
 }
 
-#messages > div {
+#messages > div:not(.my-message) {
     max-width: 80%;
     padding: 8px 12px;
     margin: 4px 10px;
@@ -270,10 +285,37 @@ body {
 }
 
 #messages > .my-message {
+    align-self: flex-end;
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+    max-width: 80%;
+    align-items: flex-end;
+    margin: 4px 10px;
+}
+
+#messages > .my-message .main-my-message {
     background-color: #2B5278;
     color: #CAD3DC;
-    align-self: flex-end;
     border-bottom-right-radius: 4px;
+    padding: 8px 12px;
+    border-radius: 18px;
+    word-wrap: break-word;
+}
+
+#messages > .my-message .deleteIcon {
+    background-color: #0E1621;
+    color: #dc3545;
+    height: 30px;
+    width: 30px;
+    align-self: flex-end;
+    border: none;
+    cursor: pointer;
+    display: none;
+}
+
+#messages > .my-message:hover .deleteIcon {
+    display: block;
 }
 
 #messages > .user-message {
@@ -332,6 +374,7 @@ body {
     padding: 10px;
     background-color: #17212B;
     margin-left: 2px;
+    position: relative;
 }
 
 .messageInput {
@@ -366,7 +409,64 @@ body {
     background-color: #4777a3;
 }
 
+/* Style for emoji section */
+.emoji-picker {
+    position: absolute;
+    bottom: 50px;
+    right: 0;
+    width: 300px;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: #17212B;
+    border-radius: 10px;
+    padding: 10px;
+    display: none;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 1px;
+    z-index: 1000;
+}
+
+.emoji-picker span {
+    font-size: 1.1rem;
+    cursor: pointer;
+    text-align: center;
+    padding: 3px;
+    border-radius: 5px;
+}
+
+.emoji-picker span:hover {
+    background-color: #2B5278;
+}
+
+.emoji-icon {
+    cursor: pointer;
+    position: relative;
+    height: 70px;
+    width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.emoji-icon:hover + .emoji-picker,
+.emoji-picker:hover {
+    display: grid !important; 
+}
+ 
 /* Scrollbar style */
+.emoji-picker::-webkit-scrollbar {
+    width: 6px;
+}
+
+.emoji-picker::-webkit-scrollbar-track {
+    background: #17212B;
+}
+
+.emoji-picker::-webkit-scrollbar-thumb {
+    background: #2B5278;
+    border-radius: 3px;
+}
+
 #messages::-webkit-scrollbar {
     width: 6px;
 }

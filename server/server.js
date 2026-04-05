@@ -6,6 +6,8 @@ const path = require('path');
 const mongoose = require('mongoose');
 const Message = require('./models/Message');
 const User = require('./models/User');
+const formatTime = require('./utils/formatTime');
+const { authenticateSocket } = require('./middleware/auth');
 const jwt = require('jsonwebtoken');
 
 const app = express();
@@ -87,13 +89,6 @@ function getRoomList() {
     return Array.from(rooms.keys());
 }
 
-function formatTime(time = new Date()) {
-    return time.toLocaleTimeString('ko-KR', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
 async function saveMessage(room, data) {
     try {
         const message = new Message({
@@ -104,6 +99,8 @@ async function saveMessage(room, data) {
             room: room
         });
         await message.save();
+        return message;
+        console.log('messageId:', message._id);
         console.log('message successfully saved');
     } catch (err) {
         console.log('save Error', err);
@@ -121,24 +118,7 @@ mongoose.connect('mongodb://localhost:27017/chatingApp')
         console.log('Error to connect', err);
     });
 
-io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
-
-    if (!token) {
-        console.log('Socket connection rejected: No token');
-        return next(new Error('Authentication required'));
-    }
-
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        socket.user = decoded;
-        console.log('Socket authenticated:', decoded.nickname);
-        next();
-    } catch (err) {
-        console.log('Socket connection rejected: Invalid token');
-        next(new Error('Invalid token'));
-    }
-});
+io.use(authenticateSocket);
 
 io.on('connection', (socket) => {
     console.log('connected to Server', socket.id);
@@ -157,25 +137,9 @@ io.on('connection', (socket) => {
 
     socket.emit('room list', getRoomList());
 
-    /*
-    socket.on('nickname', (data) => {
-        currentUser = { nickname: data.nickname, currentRoom: null };
-        users.set(socket.id, currentUser);
-
-        console.log(`👤 ${data.nickname} joined`);
-
-        socket.emit('system message', {
-            content: `✨ Welcome ${data.nickname} ✨`,
-            timeStamp: formatTime()
-        });
-
-        socket.emit('room list', getRoomList());
-    });
-    */
-
     socket.on('chat message', async (data) => {
         if (currentUser && currentUser.currentRoom) {
-            saveMessage(currentUser.currentRoom, {
+            const savedMessage = await saveMessage(currentUser.currentRoom, {
                 type: 'user',
                 content: data.content,
                 userId: data.userId,
@@ -188,10 +152,19 @@ io.on('connection', (socket) => {
                 userId: data.userId,
                 nickname: currentUser.nickname,
                 currentRoom: currentUser.currentRoom,
-                timeStamp: formatTime()
+                timeStamp: formatTime(),
+                messageId: savedMessage._id
             });
+            console.log(savedMessage._id);
         }
     });
+
+    socket.on('delete message', async (data) => {
+        await Message.findByIdAndUpdate(data.messageId, { isDeleted: true });
+
+        io.to(data.room).emit('message deleted', { messageId: data.messageId });
+        /* io.emit('message deleted', { messageId: data.messageId }); */
+    })
 
     socket.on('create room', async (roomName) => {
         try {
@@ -215,7 +188,10 @@ io.on('connection', (socket) => {
 
                 socket.emit('room joined', roomName);
 
-                const history = await Message.find({ room: roomName }).sort({ timeStamp: 1 });
+                const history = await Message.find({
+                    room: roomName,
+                    isDeleted: { $ne: true }
+                }).sort({ timeStamp: 1 });
                 if (history) {
                     socket.emit('room history', history);
                 }
@@ -247,9 +223,20 @@ io.on('connection', (socket) => {
                 timeStamp: formatTime()
             });
 
-            const history = await Message.find({ room: roomName }).sort({ timeStamp: 1 });
+            const history = await Message.find({
+                room: roomName,
+                isDeleted: { $ne: true }
+            }).sort({ timeStamp: 1 });
             socket.emit('room history', history);
         }
+    });
+
+    socket.on('typing', (data) => {
+        socket.to(data.room).emit('user typing', { nickname: socket.user.nickname });
+    });
+
+    socket.on('stop typing', (data) => {
+        socket.to(data.room).emit('user stop typing', { nickname: socket.user.nickname });
     });
 
     socket.on('disconnect', () => {

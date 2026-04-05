@@ -9,6 +9,10 @@ const messageSchema = new mongoose.Schema({
     timeStamp: {
         type: Date,
         default: Date.now
+    },
+    isDeleted: {
+        type: Boolean,
+        default: false
     }
 });
 
