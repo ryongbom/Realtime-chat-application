@@ -13,7 +13,10 @@ const messageSchema = new mongoose.Schema({
     isDeleted: {
         type: Boolean,
         default: false
-    }
+    },
+    readBy: [{
+        type: String
+    }]
 });
 
 module.exports = mongoose.model('Message', messageSchema);

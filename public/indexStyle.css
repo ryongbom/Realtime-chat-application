@@ -221,6 +221,55 @@ body {
     align-items: center;
     justify-content: space-between;
     margin-left: 2px;
+    position: relative;
+}
+
+.room-users {
+    position: absolute;
+    width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: #17212B;
+    border: 1px solid #2B3A4A;
+    border-radius: 8px;
+    left: 20px;
+    top: 45px;
+    display: none;
+    z-index: 100;
+    padding: 5px 0;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.room-users::-webkit-scrollbar {
+    width: 6px;
+}
+
+.room-users::-webkit-scrollbar-track {
+    background: #17212B;
+}
+
+.room-users::-webkit-scrollbar-thumb {
+    background: #203e5b;
+    border-radius: 3px;
+}
+
+.room-user {
+    color: #8E9EAF;
+    align-items: center;
+    padding: 2px 5px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+#currentRoom {
+    cursor: pointer;
+}
+
+#currentRoom:hover ~ .room-users {
+    display: flex;
 }
 
 .status-section {
@@ -352,6 +401,19 @@ body {
     opacity: 0.7;
     margin-top: 4px;
     text-align: right;
+}
+
+.message-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 8px;
+}
+
+.read-status {
+    font-size: 11px;
+    color: #8E9EAF;
+    min-width: 35px;
 }
 
 .system-content {

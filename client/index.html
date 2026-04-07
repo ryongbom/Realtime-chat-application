@@ -51,6 +51,9 @@
                     <span id="currentRoom" style="margin-left: 20px; color: #2B5278;">No room</span>
                     <span id="nickname" style="margin-left: 20px; color: white;"></span>
                     <span class="status">● Connected</span>
+                    <div class="room-users">
+
+                    </div>
                 </div>
                 <div class="logout-section">
                     <button onclick="logout()" class="logoutbtn">Logout</button>
@@ -58,7 +61,7 @@
             </div>
 
             <div id="messages">
-
+                
             </div>
 
             <div class="footer-chat">
@@ -186,6 +189,7 @@
         const currentRoomSpan = document.getElementById('currentRoom');
         const emojiSection = document.querySelector('.emoji-picker');
         const statusSection = document.querySelector('.status-section');
+        const roomUsers = document.querySelector('.room-users');
         
 
         let socket = null;
@@ -332,7 +336,7 @@
             });
 
             socket.on('chat message', (data) => {
-                addMessage(data.type, data.userId, data.nickname, data.content, data.timeStamp, data.messageId);
+                addMessage(data.type, data.userId, data.nickname, data.content, data.timeStamp, data.messageId, data.readBy || []);
 
                 const currentRoom = currentRoomSpan.textContent;
                 if (data.type === 'user' && data.userId !== mySocketId) {
@@ -350,7 +354,7 @@
             socket.on('room history', (messages) => {
                 messages.forEach((message) => {
                     const timeStr = formatTime(message.timeStamp);
-                    addMessage(message.type, message.userId, message.nickname, message.content, timeStr, message._id);
+                    addMessage(message.type, message.userId, message.nickname, message.content, timeStr, message._id, message.readBy || []);
                 })
             });
 
@@ -373,7 +377,39 @@
 
             socket.on('user stop typing', (data) => {
                 document.querySelectorAll('.typing-indicator').forEach(el => el.remove());
-            })
+            });
+
+            socket.on('read update', (data) => {
+                // what is it??? 
+                const msgDiv = document.querySelector(`[data-message-id="${data.messageId}"]`);
+
+                if (msgDiv) {
+                    const readSpan = msgDiv.querySelector('.read-status');
+                    if (readSpan) {
+                        const count = data.readCount;
+                        if (count === 1) {
+                            readSpan.textContent = '✓✓';
+                        } else if (count > 1) {
+                            readSpan.textContent = `✓✓ ${count}`;
+                        }
+                    }
+                }
+            });
+
+            socket.on('room users', (data) => {
+                displayUsersInRoom(data);
+            });
+
+            socket.on('user joined', (data) => {
+                const roomUser = document.createElement('div');
+                roomUser.className = 'room-user';
+                roomUser.textContent = data.nickname;
+                if (data.userId === mySocketId) {
+                    roomUser.textContent += ' (me)';
+                    roomUser.style.color = '#2B5278';
+                }
+                roomUsers.appendChild(roomUser);
+            });
 
             socket.on('disconnect', () => {
                 console.log('Disconnected');
@@ -447,6 +483,27 @@
             }
         }
 
+        function displayUsersInRoom(users) {
+            if (!roomUsers) {
+                return;
+            }
+
+            roomUsers.innerHTML = '';
+            users.forEach(user => {
+                const roomUser = document.createElement('div');
+                roomUser.className = 'room-user';
+                roomUser.textContent = `${user.nickname}`;
+
+                if (user.userId === mySocketId || user.nickname === myNickname) {
+                    roomUser.textContent += ' (me)';
+                    roomUser.style.color = '#2B5278';
+                    roomUser.style.fontWeight = 'bold';
+                }
+
+                roomUsers.appendChild(roomUser);
+            });
+        }
+
         function joinRoom(roomName) {
             socket.emit('join room', roomName);
 
@@ -470,7 +527,7 @@
             messageInput.focus();
         }
 
-        function addMessage(type, userId, nickname, content, time, msgId) {
+        function addMessage(type, userId, nickname, content, time, msgId, readBy = []) {
             const newMessage = document.createElement('div');
             if (type === 'user') {
                 if (mySocketId === userId || myNickname === nickname) {
@@ -480,7 +537,10 @@
                             <div class="message-content">${content}</div>
                             <div class="message-time">${time}</div>
                         </div>
-                        <button class="deleteIcon" onclick="deleteMsg('${msgId}')">🗑</button>
+                        <div class="message-status">
+                            <span class="read-status">${readBy.length > 0 ? (readBy.length === 1 ? '✓✓' : `✓✓ ${readBy.length}`) : ''}</span>
+                            <button class="deleteIcon" onclick="deleteMsg('${msgId}')">🗑</button>
+                        </div>
                     `;
                     newMessage.dataset.messageId = msgId;
                 } else {
@@ -495,6 +555,22 @@
             
             messages.appendChild(newMessage);
             messages.scrollTop = messages.scrollHeight;
+
+            if (type === 'user' && mySocketId !== userId && myNickname !== nickname) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            socket.emit('read receipt', {
+                                messageId: msgId,
+                                room: currentRoomSpan.textContent
+                            });
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.5 });
+
+                observer.observe(newMessage);
+            }
         }
 
         function deleteMsg(messageId) {

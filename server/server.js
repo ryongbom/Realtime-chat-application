@@ -89,6 +89,25 @@ function getRoomList() {
     return Array.from(rooms.keys());
 }
 
+function getUsersInRoom(roomName) {
+    const roomSet = rooms.get(roomName);
+    if (!roomSet) return [];
+
+    const usersInRoom = [];
+
+    roomSet.forEach(socketId => {
+        const user = users.get(socketId);
+
+        if (user) {
+            usersInRoom.push({
+                nickname: user.nickname,
+                userId: user.userId
+            });
+        }
+    });
+    return usersInRoom;
+}
+
 async function saveMessage(room, data) {
     try {
         const message = new Message({
@@ -169,7 +188,9 @@ io.on('connection', (socket) => {
     socket.on('create room', async (roomName) => {
         try {
             if (!rooms.has(roomName)) {
-                rooms.set(roomName, new Set());
+                const roomSet = new Set();
+                roomSet.add(socket.id);
+                rooms.set(roomName, roomSet);
 
                 if (currentUser) {
                     if (currentUser.currentRoom) {
@@ -185,6 +206,11 @@ io.on('connection', (socket) => {
                     content: `'${roomName}' room created`,
                     timeStamp: formatTime()
                 });
+
+                socket.emit('room users', [{
+                    nickname: currentUser.nickname,
+                    userId: currentUser.userId
+                }]);
 
                 socket.emit('room joined', roomName);
 
@@ -216,7 +242,19 @@ io.on('connection', (socket) => {
             socket.join(roomName);
             currentUser.currentRoom = roomName;
 
+            const roomSet = rooms.get(roomName);
+            roomSet.add(socket.id);
+            rooms.set(roomName, roomSet);
+
             socket.emit('room joined', roomName);
+
+            const usersInRoom = getUsersInRoom(roomName);
+            socket.emit('room users', usersInRoom);
+
+            socket.to(roomName).emit('user joined', {
+                nickname: currentUser.nickname,
+                userId: currentUser.userId
+            });
 
             socket.to(roomName).emit('system message', {
                 content: `👋 ${currentUser.nickname} joined to this room`,
@@ -239,8 +277,34 @@ io.on('connection', (socket) => {
         socket.to(data.room).emit('user stop typing', { nickname: socket.user.nickname });
     });
 
+    socket.on('read receipt', async (data) => {
+        const { messageId, room } = data;
+        const userId = currentUser.userId;
+
+        try {
+            await Message.findByIdAndUpdate(messageId, {
+                $addToSet: { readBy: userId }
+            });
+
+            const message = await Message.findById(messageId);
+            const readCount = message.readBy.length;
+
+            io.to(room).emit('read update', {
+                messageId: messageId,
+                readCount: readCount
+            });
+        } catch (err) {
+            console.log('read receipt error:', err);
+        }
+    })
+
     socket.on('disconnect', () => {
         if (currentUser) {
+            if (currentUser.currentRoom) {
+                const roomSet = rooms.get(currentUser.currentRoom);
+                roomSet.delete(socket.id);
+                rooms.set(currentUser.currentRoom, roomSet);
+            }
             console.log(`${currentUser.nickname} disconnected`);
 
             if (currentUser.currentRoom) {
