@@ -9,6 +9,8 @@ const User = require('./models/User');
 const formatTime = require('./utils/formatTime');
 const { authenticateSocket } = require('./middleware/auth');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,7 +20,38 @@ const JWT_SECRET = 'your-super-secret-key-change-this'; // it is important for j
 
 app.use(express.static(path.join(__dirname, '../client')));
 app.use(express.static(path.join(__dirname, '../public')));
+const uploadPath = path.join(__dirname, '../public/uploads');
+app.use('/uploads', express.static(uploadPath));
 app.use(express.json());
+
+if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, unique + path.extname(file.originalname));
+    }
+});
+
+const fileFilter = (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) { // What is startWith command???
+        cb(null, true);
+    }
+    else {
+        cb(new Error('Only images allowed'), false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/index.html'));
@@ -80,7 +113,17 @@ app.post('/login', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
-})
+});
+
+app.post('/upload', upload.single('image'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+    console.log('successfully received image');
+    // Why we used url???
+    const imageUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: imageUrl });
+});
 
 const users = new Map();
 const rooms = new Map();
@@ -159,14 +202,14 @@ io.on('connection', (socket) => {
     socket.on('chat message', async (data) => {
         if (currentUser && currentUser.currentRoom) {
             const savedMessage = await saveMessage(currentUser.currentRoom, {
-                type: 'user',
+                type: data.type,
                 content: data.content,
                 userId: data.userId,
                 nickname: currentUser.nickname
             });
 
             io.to(currentUser.currentRoom).emit('chat message', {
-                type: 'user',
+                type: data.type,
                 content: data.content,
                 userId: data.userId,
                 nickname: currentUser.nickname,

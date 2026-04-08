@@ -171,11 +171,19 @@
                     <span onclick="addEmoji('👽')">👽</span>
                     <span onclick="addEmoji('👾')">👾</span>
                 </div>
+                <div class="file-upload">
+                    <!-- What is it accept? I can't know -->
+                    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    <button type="button" onclick="document.getElementById('imageInput').click()" class="image-btn">+</button>
+                </div>
                 <button onclick="sendMessage()" class="sendBtn">Send</button>
             </div>
         </div>
-        
     </div>
+
+    <audio id="notificationSound" preload="auto">
+        <source src="https://www.soundjay.com/misc/sounds/notification-01.mp3" type="audio/mpeg">
+    </audio>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -190,8 +198,8 @@
         const emojiSection = document.querySelector('.emoji-picker');
         const statusSection = document.querySelector('.status-section');
         const roomUsers = document.querySelector('.room-users');
+        const imageInput = document.getElementById('imageInput'); 
         
-
         let socket = null;
         let mySocketId = '';
         let myNickname = '';
@@ -336,7 +344,13 @@
             });
 
             socket.on('chat message', (data) => {
+                console.log('📨 받은 메시지:', data);
                 addMessage(data.type, data.userId, data.nickname, data.content, data.timeStamp, data.messageId, data.readBy || []);
+
+                // audio to receive message
+                if (data.userId !== mySocketId) {
+                    document.getElementById('notificationSound').play().catch(e => console.log(e));
+                }
 
                 const currentRoom = currentRoomSpan.textContent;
                 if (data.type === 'user' && data.userId !== mySocketId) {
@@ -527,9 +541,33 @@
             messageInput.focus();
         }
 
+        function showImagePreview(imageUrl) {
+            const modal = document.createElement('div');
+            modal.className = 'image-preview-modal';
+            modal.innerHTML = `<img src="${imageUrl}">`;
+            modal.onclick = () => modal.remove();
+            document.body.appendChild(modal);
+        }
+
         function addMessage(type, userId, nickname, content, time, msgId, readBy = []) {
             const newMessage = document.createElement('div');
-            if (type === 'user') {
+            if (type === 'image') {
+                const isMyMessage = (mySocketId === userId || myNickname === nickname);
+                newMessage.className = isMyMessage ? 'my-message' : 'user-message';
+
+                newMessage.innerHTML = `
+                    <div class="main-my-message">
+                        <img src="${content}" class="message-image" onclick="showImagePreview('${content}')">
+                        <div class="message-time">${time}</div>
+                    </div>
+                    ${isMyMessage ? `
+                    <div class="message-status">
+                        <span class="read-status">${readBy.length > 0 ? (readBy.length === 1 ? '✓✓' : `✓✓ ${readBy.length}`) : ''}</span>
+                        <button class="deleteIcon" onclick="deleteMsg('${msgId}')">🗑</button>
+                    </div>` : ''}
+                `;
+            }
+            else if (type === 'user') {
                 if (mySocketId === userId || myNickname === nickname) {
                     newMessage.className = 'my-message';
                     newMessage.innerHTML = `
@@ -571,6 +609,22 @@
 
                 observer.observe(newMessage);
             }
+
+            if (type === 'image' && mySocketId !== userId && myNickname !== nickname) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            socket.emit('read receipt', {
+                                messageId: msgId,
+                                room: currentRoomSpan.textContent
+                            });
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.5 });
+                
+                observer.observe(newMessage);
+            }
         }
 
         function deleteMsg(messageId) {
@@ -608,7 +662,43 @@
             typingTimeOut = setTimeout(() => {
                 socket.emit('stop typing', { room: currentRoomSpan.textContent });
             }, 1000);
-        })
+        });
+
+        imageInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                addSystemMessage('Image size must be less than 5MB', formatTime(new Date()));
+                imageInput.value = '';
+                return;
+            }
+
+            const formData = new FormData(); // What is FormData???
+            formData.append('image', file);
+
+            try {
+                const res = await fetch('/upload', {
+                    method: 'POST', // format must 'POST', can't POST  
+                    body: formData
+                });
+
+                const data = await res.json();
+
+                socket.emit('chat message', {
+                    type: 'image',
+                    content: data.url,
+                    userId: mySocketId,
+                    room: currentRoomSpan.textContent,
+                    timeStamp: new Date().toLocaleTimeString()
+                });
+            } catch (err) {
+                console.error('Upload error:', err);
+                addSystemMessage('Image upload failed', formatTime(new Date()));
+            }
+
+            imageInput.value = '';
+        });
 
         const savedToken = localStorage.getItem('chatToken');
         const savedNickname = localStorage.getItem('chatNickname');
