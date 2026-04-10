@@ -312,6 +312,30 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('leave room', (roomName) => {
+        if (currentUser && currentUser.currentRoom === roomName) {
+            socket.leave(roomName);
+
+            const roomSet = rooms.get(roomName);
+            if (roomSet) {
+                roomSet.delete(socket.id);
+                rooms.set(roomName, roomSet);
+            }
+
+            currentUser.currentRoom = null;
+
+            socket.to(roomName).emit('system message', {
+                content: `${currentUser.nickname} left the room`,
+                timeStamp: formatTime()
+            });
+
+            const usersInRoom = getUsersInRoom(roomName);
+            socket.to(roomName).emit('room users', usersInRoom);
+
+            console.log(`${currentUser.nickname} left ${roomName}`);
+        }
+    })
+
     socket.on('typing', (data) => {
         socket.to(data.room).emit('user typing', { nickname: socket.user.nickname });
     });

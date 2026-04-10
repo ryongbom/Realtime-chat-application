@@ -1,5 +1,6 @@
 # Node modules - 이게 가장 중요!
 node_modules/
+uploads/
 
 # Environment variables - 비밀정보 보호
 .env
