@@ -338,6 +338,8 @@
             });
 
             socket.on('room list', (rooms) => {
+                // const roomNames = rooms.map(room => room.roomName); // I didn't know
+                
                 displayRoomList(rooms);
             });
 
@@ -480,18 +482,41 @@
         function displayRoomList(rooms) {
             roomList.innerHTML = '';
             rooms.forEach(room => {
-                const newRoom = document.createElement('div');
-                newRoom.className = 'newRoom';
-                newRoom.innerHTML = `
-                        <p class="newRoom-name">${escapeHtml(room)}</p>
-                    `;
-                newRoom.onclick = () => joinRoom(room); // This is active when newRoom click
-                roomList.appendChild(newRoom);
+                console.log(mySocketId);
+                console.log(room.createdUserNickname);
+                if (room.createdUserNickname === myNickname) {
+                    const newRoom = document.createElement('div');
+                    newRoom.className = 'newRoom';
+                    newRoom.innerHTML = `
+                            <p class="newRoom-name">${escapeHtml(room.roomName)}</p>
+                            <button class="deleteRoomIcon" onclick="deleteRoom('${escapeHtml(room.roomName)}')">🗑</button>
+                        `;
+                    newRoom.onclick = () => joinRoom(room.roomName); // This is active when newRoom click
+                    roomList.appendChild(newRoom);
 
-                if (unreadCounts[room] > 0) {
-                    upgradeRoomBadge(room);
+                    if (unreadCounts[room.roomName] > 0) {
+                        upgradeRoomBadge(room.roomName);
+                    }
+                }
+                else {
+                    const newRoom = document.createElement('div');
+                    newRoom.className = 'newRoom';
+                    newRoom.innerHTML = `
+                            <p class="newRoom-name">${escapeHtml(room.roomName)}</p>
+                        `;
+                    newRoom.onclick = () => joinRoom(room.roomName); // This is active when newRoom click
+                    roomList.appendChild(newRoom);
+
+                    if (unreadCounts[room.roomName] > 0) {
+                        upgradeRoomBadge(room.roomName);
+                    }
                 }
             });
+        }
+
+        function deleteRoom(roomName) {
+            console.log('🗑️ deleteRoom called:', roomName);
+            socket.emit('delete room', roomName);
         }
 
         function upgradeRoomBadge(roomName) {

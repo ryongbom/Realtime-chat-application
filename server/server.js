@@ -6,11 +6,13 @@ const path = require('path');
 const mongoose = require('mongoose');
 const Message = require('./models/Message');
 const User = require('./models/User');
+const Room = require('./models/Room');
 const formatTime = require('./utils/formatTime');
 const { authenticateSocket } = require('./middleware/auth');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const fs = require('fs');
+const { convertProcessSignalToExitCode } = require('util');
 
 const app = express();
 const server = http.createServer(app);
@@ -128,8 +130,9 @@ app.post('/upload', upload.single('image'), (req, res) => {
 const users = new Map();
 const rooms = new Map();
 
-function getRoomList() {
-    return Array.from(rooms.keys());
+async function getRoomList() {
+    const chatRooms = await Room.find().sort({ createdAt: 1 });
+    return chatRooms;
 }
 
 function getUsersInRoom(roomName) {
@@ -182,7 +185,7 @@ mongoose.connect('mongodb://localhost:27017/chatingApp')
 
 io.use(authenticateSocket);
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
     console.log('connected to Server', socket.id);
     let currentUser = {
         nickname: socket.user.nickname,
@@ -197,7 +200,7 @@ io.on('connection', (socket) => {
         timeStamp: formatTime()
     });
 
-    socket.emit('room list', getRoomList());
+    socket.emit('room list', await getRoomList());
 
     socket.on('chat message', async (data) => {
         if (currentUser && currentUser.currentRoom) {
@@ -226,14 +229,47 @@ io.on('connection', (socket) => {
 
         io.to(data.room).emit('message deleted', { messageId: data.messageId });
         /* io.emit('message deleted', { messageId: data.messageId }); */
-    })
+    });
+
+    socket.on('delete room', async (roomName) => {
+        await Room.deleteOne({ roomName: roomName });
+        await Message.deleteMany({ room: roomName });
+        rooms.delete(roomName);
+
+        if (currentUser.currentRoom === roomName) {
+            socket.leave(roomName);
+            currentUser.currentRoom = null;
+        }
+
+        io.emit('room list', await getRoomList());
+        socket.to(roomName).emit('system message', {
+            content: `${currentUser.nickname} deleted this room`,
+            timeStamp: formatTime()
+        });
+    });
 
     socket.on('create room', async (roomName) => {
         try {
+            const existingRoom = await Room.findOne({ roomName });
+            if (existingRoom) {
+                socket.emit('system message', {
+                    content: `⚠️ Room '${roomName}' already exists!`
+                });
+                return;
+            }
+
             if (!rooms.has(roomName)) {
                 const roomSet = new Set();
                 roomSet.add(socket.id);
                 rooms.set(roomName, roomSet);
+
+                const roomname = new Room({
+                    roomName: roomName,
+                    createdUserNickname: currentUser.nickname,
+                    createdUserId: currentUser.userId
+                });
+
+                await roomname.save();
 
                 if (currentUser) {
                     if (currentUser.currentRoom) {
@@ -243,7 +279,7 @@ io.on('connection', (socket) => {
                     currentUser.currentRoom = roomName;
                 }
 
-                io.emit('room list', getRoomList());
+                io.emit('room list', await getRoomList());
 
                 socket.emit('system message', {
                     content: `'${roomName}' room created`,
@@ -354,6 +390,10 @@ io.on('connection', (socket) => {
             });
 
             const message = await Message.findById(messageId);
+            if (!message) {
+                console.log('Message not found:', messageId);
+                return;
+            }
             const readCount = message.readBy.length;
 
             io.to(room).emit('read update', {
@@ -369,8 +409,10 @@ io.on('connection', (socket) => {
         if (currentUser) {
             if (currentUser.currentRoom) {
                 const roomSet = rooms.get(currentUser.currentRoom);
-                roomSet.delete(socket.id);
-                rooms.set(currentUser.currentRoom, roomSet);
+                if (roomSet) {
+                    roomSet.delete(socket.id);
+                    rooms.set(currentUser.currentRoom, roomSet);
+                }
             }
             console.log(`${currentUser.nickname} disconnected`);
 

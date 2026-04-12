@@ -83,7 +83,7 @@ body {
 }
 
 .tab-btn.active {
-    background-color: var(--hover-bg);
+    background-color: #2B5278;
     color: white;
 }
 
@@ -614,6 +614,16 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.newRoom .deleteRoomIcon {
+    background-color: inherit;
+    color: #dc3545;
+    height: 30px;
+    width: 30px;
+    align-self: flex-end;
+    border: none;
+    cursor: pointer;
 }
 
 .emoji-icon:hover + .emoji-picker,
